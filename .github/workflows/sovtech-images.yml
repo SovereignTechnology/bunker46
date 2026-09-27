@@ -1,0 +1,194 @@
+# SovTech deployment build of Bunker46 for latitude-5400 (sovtech/l5400, kata/bunker46).
+# Source: origin dsbaars/bunker46 main + open upstream PR #25 (relay connect timeouts no longer
+# fatal) + PR #26 (NIP-46 connect replies "ack" unless the request presents the secret).
+# The lint/build, unit and integration jobs are copied verbatim from ci.yml (which only runs on
+# main/master/PRs); the image job then builds origin's own Dockerfiles and publishes OCI tarballs
+# + SHA256SUMS as an artifact. No secrets are used. The images are imported on the host by digest.
+name: sovtech-images
+
+on:
+  push:
+    branches: [sovtech/deploy]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-build:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+    # Dummy URL only for prisma generate during install; no DB needed for lint/build.
+    env:
+      DATABASE_URL: postgresql://localhost:5432/ci?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Lint (security)
+        run: pnpm run lint:security
+
+      - name: Format check
+        run: |
+          pnpm run format
+          if ! git diff --exit-code; then
+            echo "::error::Some files are not formatted. Run 'pnpm run format' and commit the changes."
+            git diff --name-only
+            exit 1
+          fi
+
+      - name: Build
+        run: pnpm run build
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    # Dummy URL only for prisma generate during install; unit tests mock Prisma.
+    env:
+      DATABASE_URL: postgresql://localhost:5432/ci?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm --filter @bunker46/shared-types --filter @bunker46/config run build
+
+      - name: Run unit tests
+        run: pnpm run test
+
+  integration:
+    name: Migrations & DB integration tests
+    runs-on: ubuntu-latest
+    # postgres:17-alpine matches production (docker-compose.yml), so the migration chain is
+    # exercised against the same major version it runs on in prod.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bunker46
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bunker46
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm --filter @bunker46/shared-types --filter @bunker46/config run build
+
+      # Applies every committed migration in order against an empty DB: proves the full chain
+      # (initial schema -> current) applies cleanly. Uses `migrate deploy`, NOT `db:push`, so it
+      # is the migration SQL that actually runs — db:push would bypass the migration files.
+      - name: Apply migrations from scratch (full chain)
+        run: pnpm --filter @bunker46/server run db:deploy
+
+      # Fails (exit code 2) if the migrated DB and schema.prisma disagree — catches a schema.prisma
+      # edit that was never captured in a migration.
+      - name: Check migrations match schema (no drift)
+        run: pnpm --filter @bunker46/server run db:check-drift
+
+      # Runs the RUN_DB_TESTS-gated integration specs against the migration-built schema.
+      - name: Run DB integration tests
+        run: pnpm --filter @bunker46/server run test:integration
+
+  images:
+    name: Build OCI images (server + web)
+    needs: [lint-and-build, test, integration]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build server image (apps/server/Dockerfile, target production)
+        run: |
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+            -f apps/server/Dockerfile --target production \
+            --metadata-file server-meta.json \
+            --output "type=oci,dest=bunker46-server.oci.tar,name=docker.io/kata/bunker46-server:${GITHUB_SHA::12}" .
+
+      - name: Build web image (apps/web/Dockerfile, target production)
+        run: |
+          docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+            -f apps/web/Dockerfile --target production \
+            --metadata-file web-meta.json \
+            --output "type=oci,dest=bunker46-web.oci.tar,name=docker.io/kata/bunker46-web:${GITHUB_SHA::12}" .
+
+      - name: Checksums and build metadata
+        run: |
+          sha256sum bunker46-server.oci.tar bunker46-web.oci.tar | tee SHA256SUMS
+          echo "source commit: ${GITHUB_SHA}"
+          jq -c '{digest: ."containerimage.digest", config: ."containerimage.config.digest"}' server-meta.json web-meta.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sovtech-bunker46-images-${{ github.sha }}
+          path: |
+            bunker46-server.oci.tar
+            bunker46-web.oci.tar
+            SHA256SUMS
+            server-meta.json
+            web-meta.json
+          retention-days: 14
+          if-no-files-found: error
