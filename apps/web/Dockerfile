@@ -1,4 +1,4 @@
-FROM node:24-slim AS base
+FROM node:24-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS base
 RUN corepack enable && corepack prepare pnpm@10.10.0 --activate
 WORKDIR /app
 
@@ -19,7 +19,7 @@ COPY . .
 WORKDIR /app
 RUN pnpm --filter @bunker46/web... run build
 
-FROM caddy:2-alpine AS production
+FROM caddy:2-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5 AS production
 COPY --from=build /app/apps/web/dist /srv
 COPY apps/web/Caddyfile /etc/caddy/Caddyfile
 EXPOSE 8080

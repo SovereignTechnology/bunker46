@@ -66,9 +66,9 @@ async function handleLogout() {
       ]"
     >
       <div class="flex items-center gap-2 h-16 px-4 border-b border-border shrink-0">
-        <img src="/logo.webp" alt="Bunker46" class="w-8 h-8 rounded-lg object-contain shrink-0" />
+        <img src="/logo.webp" alt="SovereignBunker" class="w-8 h-8 rounded-lg object-contain shrink-0" />
         <span v-if="!uiState.sidebarCollapsed" class="font-semibold text-lg truncate"
-          >Bunker46</span
+          >SovereignBunker</span
         >
         <button
           v-if="!uiState.sidebarCollapsed"

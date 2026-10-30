@@ -73,7 +73,7 @@ async function handleRegister() {
     <template v-else>
       <div class="text-center mb-8">
         <h1 class="text-2xl font-bold">Create Account</h1>
-        <p class="text-muted-foreground mt-2">Set up your Bunker46 account</p>
+        <p class="text-muted-foreground mt-2">Set up your SovereignBunker account</p>
       </div>
 
       <div

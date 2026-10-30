@@ -53,7 +53,7 @@ async function bootstrap() {
 
   if (env.NODE_ENV !== 'production') {
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('Bunker46 API')
+      .setTitle('SovereignBunker API')
       .setDescription('NIP-46 Nsec Bunker Management API')
       .setVersion('0.1.0')
       .addBearerAuth()

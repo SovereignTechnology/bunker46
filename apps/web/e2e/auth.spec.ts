@@ -5,7 +5,7 @@ test.describe('Authentication', () => {
   test('should show login page by default', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveURL(/\/login/);
-    await expect(page.getByText('Welcome to Bunker46')).toBeVisible();
+    await expect(page.getByText('Welcome to SovereignBunker')).toBeVisible();
   });
 
   test('should show register link on login page', async ({ page }) => {

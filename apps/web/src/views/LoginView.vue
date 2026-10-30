@@ -153,10 +153,10 @@ async function handlePasskeyLogin() {
     <div class="text-center mb-8">
       <img
         src="/logo.webp"
-        alt="Bunker46"
+        alt="SovereignBunker"
         class="w-16 h-16 rounded-2xl object-contain mx-auto mb-4"
       />
-      <h1 class="text-2xl font-bold">Welcome to Bunker46</h1>
+      <h1 class="text-2xl font-bold">Welcome to SovereignBunker</h1>
       <p class="text-muted-foreground mt-2">Sign in to manage your NIP-46 bunker</p>
     </div>
 

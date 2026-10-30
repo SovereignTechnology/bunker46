@@ -1,8 +1,10 @@
-# Bunker46
+# SovereignBunker
 
 <p align="center">
-  <img src="apps/web/public/logo.webp" alt="Bunker46" width="80" />
+  <img src="apps/web/public/logo.webp" alt="SovereignBunker" width="80" />
 </p>
+
+> **SovereignBunker** is [Sovereign Technology](https://sovtech.pro)'s maintained fork of [Bunker46](https://github.com/dsbaars/bunker46) by Djuri Baars (MIT). It tracks upstream and carries the fixes we run in production. See [SOVEREIGNBUNKER.md](SOVEREIGNBUNKER.md) for what differs and how it is built. The rest of this README is upstream's.
 
 [![CI](https://github.com/dsbaars/bunker46/actions/workflows/ci.yml/badge.svg)](https://github.com/dsbaars/bunker46/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue)](https://www.typescriptlang.org/)
